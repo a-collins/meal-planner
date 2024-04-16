@@ -1,36 +1,56 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
 	"github.com/a-collins/meal-planner/storage"
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/a-collins/meal-planner/types"
+	log "github.com/sirupsen/logrus"
+	// "github.com/aws/aws-sdk-go/aws"
 )
 
 func main() {
-	s3Client := storage.S3Client{}
-	err := s3Client.Initialise()
+	log.SetLevel(log.InfoLevel)
+	filePath := "meals.json"
+	sd := storage.StorageDriver{
+		Storer: storage.FileStorer{
+			FilePath: filePath,
+		},
+	}
+
+	initialMeals := []types.Meal{
+		{
+			Name:        "fajitas",
+			Ingredients: []string{"wraps", "peppers", "onion", "spices", "cheese", "chicken"},
+			Tags:        []string{"easy", "mexican", "weeknight"},
+		},
+		{
+			Name: "some other meal",
+		},
+		{
+			Name:        "chicken",
+			Ingredients: []string{"just chicken"},
+			Tags:        []string{"plain", "bland", "weekend"},
+		},
+	}
+
+	mealObj, err := json.Marshal(initialMeals)
 	if err != nil {
-		fmt.Println("Error creating session: %v", err)
-		os.Exit(1)
+		panic(fmt.Errorf("failed to marshal initial meals - %v", err))
 	}
-
-	_, err = s3Client.Session.Config.Credentials.Get()
-	fmt.Println(err)
-
-	storage.Hello("aaron")
-	result, err := s3Client.S3.ListBuckets(nil)
+	err = os.WriteFile(filePath, mealObj, 0777)
 	if err != nil {
-		fmt.Println("Error listing buckets: %v", err)
-		os.Exit(1)
+		panic(fmt.Errorf("failed writing meal initial meals - %v", err))
 	}
 
-	fmt.Println("Buckets:")
-
-	for _, b := range result.Buckets {
-		fmt.Printf("* %s created on %s\n",
-			aws.StringValue(b.Name), aws.TimeValue(b.CreationDate))
+	err = sd.AddMeal(&types.Meal{Name: "pasta"})
+	if err != nil {
+		log.Error(err)
 	}
-
+	err = sd.DeleteMeal("chicken")
+	if err != nil {
+		log.Error(err)
+	}
 }
